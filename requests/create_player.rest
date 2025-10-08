@@ -1,0 +1,46 @@
+POST http://localhost:3001/anari/players
+Content-Type: application/json
+
+{
+    "name": "Akkeri",
+    "teams": [
+        {
+            "teamId": "FLA"
+        },
+        {
+            "teamId": "TBL"
+        },
+        {
+            "teamId": "OTT"
+        },
+        {
+            "teamId": "WPG"
+        },
+        {
+            "teamId": "COL"
+        },
+        {
+            "teamId": "DAL"
+        },
+        {
+            "teamId": "EDM"
+        },
+        {
+            "teamId": "LAK"
+        },
+        {
+            "teamId": "VGK"
+        },
+        {
+            "teamId": "CAR"
+        },
+        {
+            "teamId": "NJD"
+        },
+        {
+            "teamId": "WSH"
+        }
+    ],
+    "points": 0,
+    "statLeader": 133
+}

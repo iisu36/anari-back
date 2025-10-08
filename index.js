@@ -71,7 +71,7 @@ app.get('/anari/players', async (req, res) => {
 app.get('/anari/statLeader', async (req, res, next) => {
   try {
     const result = await axios.get(
-      'https://api.nhle.com/stats/rest/fi/leaders/skaters/points?cayenneExp=season=20242025%20and%20gameType=2'
+      'https://api.nhle.com/stats/rest/fi/leaders/skaters/points?cayenneExp=season=20252026%20and%20gameType=2'
     )
     const player = {
       name: result.data.data[0]?.player.lastName,
