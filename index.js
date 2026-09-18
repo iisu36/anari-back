@@ -6,6 +6,17 @@ const cors = require('cors')
 
 const Player = require('./player')
 
+const revealAt = new Date(process.env.REVEAL_AT || '2026-09-29T21:00:00.000Z')
+
+const isRevealed = () => Date.now() >= revealAt.getTime()
+
+const teamsByDivision = {
+  Atlantic: ['BOS', 'BUF', 'DET', 'FLA', 'MTL', 'OTT', 'TBL', 'TOR'],
+  Central: ['UTA', 'CHI', 'COL', 'DAL', 'MIN', 'NSH', 'STL', 'WPG'],
+  Metropolitan: ['CAR', 'CBJ', 'NJD', 'NYI', 'NYR', 'PHI', 'PIT', 'WSH'],
+  Pacific: ['ANA', 'CGY', 'EDM', 'LAK', 'SJS', 'SEA', 'VAN', 'VGK'],
+}
+
 const app = express()
 
 app.use(express.static('build'))
@@ -44,34 +55,86 @@ app.get('/anari', async (req, res, next) => {
   }
 })
 
-app.post('/anari/players', (req, res, next) => {
-  const body = req.body
-
-  const player = new Player({
-    name: body.name,
-    teams: body.teams,
-    points: body.points,
-    statLeader: body.statLeader,
+app.get('/anari/reveal-status', (req, res) => {
+  res.json({
+    revealAt: revealAt.toISOString(),
+    serverNow: new Date().toISOString(),
+    revealed: isRevealed(),
   })
+})
 
-  player
-    .save()
-    .then((savedPlayer) => {
-      res.status(201).json(savedPlayer.toJSON())
+app.post('/anari/players', async (req, res, next) => {
+  if (isRevealed()) {
+    return res.status(403).json({ error: 'Veikkausaika on päättynyt.' })
+  }
+
+  const body = req.body
+  const teams = Array.isArray(body.teams) ? body.teams : []
+  const teamIds = teams.map((team) => team.teamId)
+  const validTeamIds = Object.values(teamsByDivision).flat()
+  const validSelection =
+    teams.length === 12 &&
+    new Set(teamIds).size === 12 &&
+    teamIds.every((teamId) => validTeamIds.includes(teamId)) &&
+    Object.values(teamsByDivision).every(
+      (divisionTeams) =>
+        teamIds.filter((teamId) => divisionTeams.includes(teamId)).length === 3,
+    )
+
+  if (
+    !body.name?.trim() ||
+    !validSelection ||
+    !Number.isFinite(Number(body.statLeader))
+  ) {
+    return res.status(400).json({
+      error:
+        'Tarvitaan nimi, pistepörssin voittopisteet ja kolme joukkuetta per divisioona.',
     })
-    .catch((error) => next(error))
+  }
+
+  try {
+    const existingPlayer = await Player.findOne({ name: body.name.trim() })
+    if (existingPlayer) {
+      return res.status(409).json({ error: 'Nimi varattu.' })
+    }
+
+    const player = new Player({
+      name: body.name.trim(),
+      teams,
+      points: body.points,
+      statLeader: body.statLeader,
+    })
+    const savedPlayer = await player.save()
+    return res.status(201).json({
+      name: savedPlayer.name,
+      choicesRevealed: false,
+    })
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Nimi varattu.' })
+    }
+    return next(error)
+  }
 })
 
 app.get('/anari/players', async (req, res) => {
-  Player.find({}).then((players) => {
-    res.json(players)
-  })
+  const players = await Player.find({}).lean()
+  if (!isRevealed()) {
+    return res.json(
+      players.map((player) => ({
+        name: player.name,
+        choicesRevealed: false,
+      })),
+    )
+  }
+
+  res.json(players.map((player) => ({ ...player, choicesRevealed: true })))
 })
 
 app.get('/anari/statLeader', async (req, res, next) => {
   try {
     const result = await axios.get(
-      'https://api.nhle.com/stats/rest/fi/leaders/skaters/points?cayenneExp=season=20252026%20and%20gameType=2'
+      'https://api.nhle.com/stats/rest/fi/leaders/skaters/points?cayenneExp=season=20262027%20and%20gameType=2',
     )
     const player = {
       name: result.data.data[0]?.player.lastName,

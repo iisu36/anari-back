@@ -8,7 +8,7 @@ const teamSchema = new mongoose.Schema({
 })
 
 const playerSchema = new mongoose.Schema({
-  name: String,
+  name: { type: String, required: true, unique: true, trim: true },
   teams: [teamSchema],
   points: Number,
   statLeader: Number,
